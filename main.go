@@ -17,7 +17,7 @@ func main() {
 	app.Logger.Println("We are running the app")
 	r := routes.SetupRoutes(app)
 	server := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":3001",
 		Handler:      r,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,

@@ -2,16 +2,24 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/Hajdudev/ecoDatabase/internal/store"
 	"github.com/go-chi/chi/v5"
 )
 
-type DatabaseHandler struct{}
+type DatabaseHandler struct {
+	postgresStore store.PostgresStore
+	logger        *log.Logger
+}
 
-func NewDatabaseHandler() *DatabaseHandler {
-	return &DatabaseHandler{}
+func NewDatabaseHandler(postgresStore store.PostgresStore, logger *log.Logger) *DatabaseHandler {
+	return &DatabaseHandler{
+		postgresStore: postgresStore,
+		logger:        logger,
+	}
 }
 
 func (wh *DatabaseHandler) FindRoutes(w http.ResponseWriter, r *http.Request) {
@@ -27,5 +35,5 @@ func (wh *DatabaseHandler) FindRoutes(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	fmt.Fprintf(w, "Found the routes with a id %d |n", routesID)
+	fmt.Fprintf(w, "Found the routes with a id %d \n", routesID)
 }
