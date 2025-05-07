@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/Hajdudev/ecoDatabase/internal/store"
-	"github.com/go-chi/chi/v5"
 )
 
 type DatabaseHandler struct {
@@ -22,18 +20,21 @@ func NewDatabaseHandler(databaseStore store.DatabaseStore, logger *log.Logger) *
 	}
 }
 
-func (wh *DatabaseHandler) FindRoutes(w http.ResponseWriter, r *http.Request) {
-	paramsRoutes := chi.URLParam(r, "names")
-	if paramsRoutes == "" {
-		http.NotFound(w, r)
+func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	from := query.Get("from")
+	to := query.Get("to")
+	date := query.Get("date")
+
+	if from == "" || to == "" {
+		http.Error(w, "Missing required parameters 'from' and 'to'", http.StatusBadRequest)
 		return
 	}
 
-	routesID, err := strconv.ParseInt(paramsRoutes, 10, 64)
-	if err != nil {
-		fmt.Fprintln(w, "Error 2")
-		http.NotFound(w, r)
-		return
-	}
-	fmt.Fprintf(w, "Found the routes with a id %d \n", routesID)
+	// Use the parameters
+	fmt.Fprintf(w, "Route search parameters:\n")
+	fmt.Fprintf(w, "From: %s\n", from)
+	fmt.Fprintf(w, "To: %s\n", to)
+	fmt.Fprintf(w, "Date: %s\n", date)
 }
