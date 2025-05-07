@@ -24,10 +24,10 @@ func NewApplication() (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	postgreStore := store.NewPostgresStore(db)
+	databaseStore := store.NewPostgresStore(db)
 
 	defer db.Close()
-	dbHandler := api.NewDatabaseHandler(*postgreStore, logger)
+	dbHandler := api.NewDatabaseHandler(databaseStore, logger)
 	app := &Application{
 		Logger:          logger,
 		DatabaseHandler: dbHandler,

@@ -11,13 +11,13 @@ import (
 )
 
 type DatabaseHandler struct {
-	postgresStore store.PostgresStore
+	databaseStore store.DatabaseStore
 	logger        *log.Logger
 }
 
-func NewDatabaseHandler(postgresStore store.PostgresStore, logger *log.Logger) *DatabaseHandler {
+func NewDatabaseHandler(databaseStore store.DatabaseStore, logger *log.Logger) *DatabaseHandler {
 	return &DatabaseHandler{
-		postgresStore: postgresStore,
+		databaseStore: databaseStore,
 		logger:        logger,
 	}
 }
