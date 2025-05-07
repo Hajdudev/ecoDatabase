@@ -8,7 +8,7 @@ import (
 )
 
 func Open() (*sql.DB, error) {
-	db, err := sql.Open("pgx", "")
+	db, err := sql.Open("pgx", "host=164.92.241.121 user=postgres password= dbname=postgres port=5432")
 	if err != nil {
 		return nil, fmt.Errorf("db: open %w", err)
 	}

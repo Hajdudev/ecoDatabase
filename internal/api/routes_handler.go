@@ -32,7 +32,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use the parameters
+	wh.databaseStore.GetRoutes()
 	fmt.Fprintf(w, "Route search parameters:\n")
 	fmt.Fprintf(w, "From: %s\n", from)
 	fmt.Fprintf(w, "To: %s\n", to)
