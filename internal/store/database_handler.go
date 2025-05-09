@@ -1,58 +1,45 @@
 package store
 
 import (
-	"database/sql"
-	"encoding/json"
+	"context"
 	"fmt"
+	"os"
 
 	"github.com/Hajdudev/ecoDatabase/models"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func NewPostgresStore(db *sql.DB) *PostgresStore {
+func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{db: db}
 }
 
 type DatabaseStore interface {
-	GetRoutes()
+	GetUserByID(id string) (*models.User, error)
 }
 
-func (pg *PostgresStore) GetRoutes() {
-	query := "SELECT id, created_at, email, name, image, recent_rided FROM users"
+func (pg *PostgresStore) GetUserByID(id string) (*models.User, error) {
+	query := "SELECT id, created_at, email, name, image, recent_rides FROM users WHERE id = $1"
 
-	rows, err := pg.db.Query(query)
+	var user models.User
+	var recentRidesBytes []string
+	err := pg.db.QueryRow(context.Background(), query, id).Scan(
+		&user.ID,
+		&user.CreatedAt,
+		&user.Email,
+		&user.Name,
+		&user.Image,
+		&recentRidesBytes,
+	)
 	if err != nil {
-		fmt.Println("Error querying database:", err)
-		return
-	}
-	defer rows.Close()
-
-	fmt.Println("Users found in database:")
-
-	for rows.Next() {
-		var user models.User
-		var recentRidedBytes []byte
-
-		err := rows.Scan(&user.ID, &user.CreatedAt, &user.Email, &user.Name, &user.Image, &recentRidedBytes)
-		if err != nil {
-			fmt.Println("Error scanning row:", err)
-			continue
-		}
-
-		if len(recentRidedBytes) > 0 {
-			json.Unmarshal(recentRidedBytes, &user.RecentRided)
-		}
-
-		fmt.Printf("User: %+v\n", user)
+		fmt.Fprintf(os.Stderr, "Error fetching user by ID: %v\n", err)
+		return nil, err
 	}
 
-	if err = rows.Err(); err != nil {
-		fmt.Println("Error during row iteration:", err)
-		return
-	}
+	user.RecentRides = recentRidesBytes
 
-	fmt.Println("Query completed successfully")
+	return &user, nil
 }

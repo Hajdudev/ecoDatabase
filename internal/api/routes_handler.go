@@ -32,7 +32,12 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wh.databaseStore.GetRoutes()
+	userID := "61"
+	user, err := wh.databaseStore.GetUserByID(userID)
+	if err != nil {
+		fmt.Fprintln(w, "Error getting the user")
+	}
+	fmt.Fprintf(w, "The users %+v", user)
 	fmt.Fprintf(w, "Route search parameters:\n")
 	fmt.Fprintf(w, "From: %s\n", from)
 	fmt.Fprintf(w, "To: %s\n", to)

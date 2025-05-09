@@ -93,5 +93,5 @@ type User struct {
 	Email       string    `db:"email" json:"email"`
 	Name        string    `db:"name" json:"name"`
 	Image       string    `db:"image" json:"image"`
-	RecentRided []string  `db:"recent_rided" json:"recent_rided"`
+	RecentRides []string  `db:"recent_rides" json:"recent_rides"`
 }

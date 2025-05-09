@@ -1,18 +1,25 @@
 package store
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
+	"os"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
-func Open() (*sql.DB, error) {
-	db, err := sql.Open("pgx", "host=164.92.241.121 user=postgres password= dbname=postgres port=5432")
+func Open() (*pgxpool.Pool, error) {
+	err := godotenv.Load()
 	if err != nil {
-		return nil, fmt.Errorf("db: open %w", err)
+		panic(err)
+	}
+	dbURL := os.Getenv("DATABASE_URL")
+	dbpool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to create connection pool: %v\n", err)
+		os.Exit(1)
 	}
 
-	fmt.Println("Connected to Database...")
-	return db, nil
+	return dbpool, nil
 }
