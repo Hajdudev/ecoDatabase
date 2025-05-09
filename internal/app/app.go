@@ -1,7 +1,6 @@
 package app
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,12 +8,13 @@ import (
 
 	"github.com/Hajdudev/ecoDatabase/internal/api"
 	"github.com/Hajdudev/ecoDatabase/internal/store"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Application struct {
 	Logger          *log.Logger
 	DatabaseHandler *api.DatabaseHandler
-	Database        *sql.DB
+	Database        *pgxpool.Pool
 }
 
 func NewApplication() (*Application, error) {
@@ -24,10 +24,10 @@ func NewApplication() (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	databaseStore := store.NewPostgresStore(db)
 
-	defer db.Close()
+	databaseStore := store.NewPostgresStore(db)
 	dbHandler := api.NewDatabaseHandler(databaseStore, logger)
+
 	app := &Application{
 		Logger:          logger,
 		DatabaseHandler: dbHandler,
@@ -37,5 +37,5 @@ func NewApplication() (*Application, error) {
 }
 
 func (a *Application) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "THe app is healthy \n")
+	fmt.Fprintf(w, "The app is healthy\n")
 }
