@@ -19,6 +19,37 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 
 type DatabaseStore interface {
 	GetUserByID(id string) (*models.User, error)
+	GetRoutesById(firstID string, secondID string) ([]string, error)
+}
+
+func (pg *PostgresStore) GetRoutesById(firstID string, secondID string) ([]string, error) {
+	query := `
+		SELECT trip_id
+		FROM stop_times
+		WHERE stop_id IN ($1, $2)
+		GROUP BY trip_id
+		HAVING COUNT(DISTINCT stop_id) = 2
+	`
+
+	rows, err := pg.db.Query(context.Background(), query, firstID, secondID)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+
+	defer rows.Close()
+
+	var trips []string
+	for rows.Next() {
+		var tripID string
+		if err := rows.Scan(&tripID); err != nil {
+			return nil, fmt.Errorf("error scanning row: %w", err)
+		}
+		trips = append(trips, tripID)
+	}
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error during rows iteration: %w", rows.Err())
+	}
+	return trips, nil
 }
 
 func (pg *PostgresStore) GetUserByID(id string) (*models.User, error) {

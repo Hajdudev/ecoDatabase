@@ -95,3 +95,18 @@ type User struct {
 	Image       string    `db:"image" json:"image"`
 	RecentRides []string  `db:"recent_rides" json:"recent_rides"`
 }
+
+type RouteResult struct {
+	tripId             string
+	tripName           string
+	fromStopId         string
+	fromStopName       string
+	toStopId           string
+	toStopName         string
+	departureTime      string
+	arrivalTime        string
+	serviceId          string
+	departureDayOffset int
+	arrivalDayOffset   int
+	searchDate         string
+}
