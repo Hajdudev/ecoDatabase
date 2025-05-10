@@ -22,6 +22,29 @@ type DatabaseStore interface {
 	GetRoutesById(firstID string, secondID string) ([]string, error)
 }
 
+func (pg *PostgresStore) GetStopInfo(stopID string) (models.Stop, error) {
+	query := `
+		SELECT * 
+		FROM stops 
+		WHERE stop_id = $1
+	`
+	var stop models.Stop
+
+	err := pg.db.QueryRow(context.Background(), query, stopID).Scan(
+		&stop.StopID,
+		&stop.StopCode,
+		&stop.StopName,
+		&stop.StopDesc,
+		&stop.StopLat,
+		&stop.StopLon,
+	)
+	if err != nil {
+		return models.Stop{}, fmt.Errorf("error querying stop info: %w", err)
+	}
+
+	return stop, nil
+}
+
 func (pg *PostgresStore) GetRoutesById(firstID string, secondID string) ([]string, error) {
 	query := `
 		SELECT trip_id
