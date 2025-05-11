@@ -20,14 +20,16 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 type DatabaseStore interface {
 	GetUserByID(id string) (*models.User, error)
 	GetRoutesById(firstID string, secondID string) ([]string, error)
+	GetStopInfo(stopID string) (models.Stop, error)
 }
 
 func (pg *PostgresStore) GetStopInfo(stopID string) (models.Stop, error) {
 	query := `
-		SELECT * 
-		FROM stops 
+		SELECT stop_id, stop_code, stop_name, stop_desc, stop_lat, stop_lon
+		FROM stops
 		WHERE stop_id = $1
 	`
+
 	var stop models.Stop
 
 	err := pg.db.QueryRow(context.Background(), query, stopID).Scan(
@@ -35,13 +37,13 @@ func (pg *PostgresStore) GetStopInfo(stopID string) (models.Stop, error) {
 		&stop.StopCode,
 		&stop.StopName,
 		&stop.StopDesc,
-		&stop.StopLat,
-		&stop.StopLon,
+		&stop.StopLat, &stop.StopLon,
 	)
 	if err != nil {
 		return models.Stop{}, fmt.Errorf("error querying stop info: %w", err)
 	}
 
+	fmt.Printf("this is the stop %+v", stop)
 	return stop, nil
 }
 

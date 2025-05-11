@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/Hajdudev/ecoDatabase/internal/store"
 )
@@ -34,10 +35,24 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 
 	routes, err := wh.databaseStore.GetRoutesById(from, to)
 	if err != nil {
-		fmt.Fprintln(w, "Error getting the user")
+		http.Error(w, "Error fetching routes", http.StatusInternalServerError)
+		return
 	}
-	fmt.Fprintf(w, "The users %+v", routes)
-	fmt.Fprintf(w, "Route search parameters:\n")
+	fromStop, err := wh.databaseStore.GetStopInfo(from)
+	if err != nil {
+		http.Error(w, "Invalid 'from' id ", http.StatusBadRequest)
+		return
+	}
+
+	toStop, err := wh.databaseStore.GetStopInfo(to)
+	if err != nil {
+		http.Error(w, "Invalid 'to' id", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Fprintf(w, "The routes %s \n", strings.Join(routes, ", "))
+	fmt.Fprintf(w, "To data %+v\n", toStop)
+	fmt.Fprintf(w, "From data %+v\n", fromStop)
 	fmt.Fprintf(w, "From: %s\n", from)
 	fmt.Fprintf(w, "To: %s\n", to)
 	fmt.Fprintf(w, "Date: %s\n", date)
