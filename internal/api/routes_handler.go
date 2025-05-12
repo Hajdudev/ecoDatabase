@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/Hajdudev/ecoDatabase/internal/store"
@@ -37,30 +36,50 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 
 	var wg sync.WaitGroup
 
-	routesChan := make(chan []string)
-	fromStopChan := make(chan models.Stop)
-	toStopChan := make(chan models.Stop)
+	routesChan := make(chan []models.Trip, 1)
+	fromStopChan := make(chan models.Stop, 1)
+	toStopChan := make(chan models.Stop, 1)
+	errorChan := make(chan error, 3)
 
-	func() {
-		wg.Add(3)
+	wg.Add(3)
 
-		go wh.databaseStore.GetRoutesById(from, to, routesChan, &wg)
-		go wh.databaseStore.GetStopInfo(from, fromStopChan, &wg)
-		go wh.databaseStore.GetStopInfo(to, toStopChan, &wg)
-		wg.Wait()
+	go func() {
+		err := wh.databaseStore.GetRoutesById(from, to, routesChan, &wg)
+		if err != nil {
+			errorChan <- err
+		}
 		close(routesChan)
+	}()
+	go func() {
+		err := wh.databaseStore.GetStopInfo(from, fromStopChan, &wg)
+		if err != nil {
+			errorChan <- err
+		}
 		close(fromStopChan)
+	}()
+	go func() {
+		err := wh.databaseStore.GetStopInfo(to, toStopChan, &wg)
+		if err != nil {
+			errorChan <- err
+		}
 		close(toStopChan)
 	}()
+	wg.Wait()
+	close(errorChan)
+
+	for err := range errorChan {
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 
 	routes := <-routesChan
 	fromStop := <-fromStopChan
 	toStop := <-toStopChan
 
-	fmt.Fprintf(w, "The routes %s \n", strings.Join(routes, ", "))
+	fmt.Fprintf(w, "The routes %+v \n", routes)
 	fmt.Fprintf(w, "To data %+v\n", toStop)
 	fmt.Fprintf(w, "From data %+v\n", fromStop)
-	fmt.Fprintf(w, "From: %s\n", from)
-	fmt.Fprintf(w, "To: %s\n", to)
 	fmt.Fprintf(w, "Date: %s\n", date)
 }
