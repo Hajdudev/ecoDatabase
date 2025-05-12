@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -58,20 +59,20 @@ type StopTime struct {
 }
 
 type Stop struct {
-	StopID             string  `db:"stop_id" json:"stop_id"`
-	StopCode           string  `db:"stop_code" json:"stop_code"`
-	StopName           string  `db:"stop_name" json:"stop_name"`
-	StopDesc           string  `db:"stop_desc" json:"stop_desc"`
-	StopLat            float64 `db:"stop_lat" json:"stop_lat"`
-	StopLon            float64 `db:"stop_lon" json:"stop_lon"`
-	ZoneID             string  `db:"zone_id" json:"zone_id"`
-	StopURL            string  `db:"stop_url" json:"stop_url"`
-	LocationType       int     `db:"location_type" json:"location_type"`
-	ParentStation      string  `db:"parent_station" json:"parent_station"`
-	StopTimezone       string  `db:"stop_timezone" json:"stop_timezone"`
-	WheelchairBoarding int     `db:"wheelchair_boarding" json:"wheelchair_boarding"`
-	LevelID            string  `db:"level_id" json:"level_id"`
-	PlatformCode       string  `db:"platform_code" json:"platform_code"`
+	StopID             string         `db:"stop_id" json:"stop_id"`
+	StopCode           string         `db:"stop_code" json:"stop_code"`
+	StopName           string         `db:"stop_name" json:"stop_name"`
+	StopDesc           sql.NullString `db:"stop_desc" json:"stop_desc"`
+	StopLat            float64        `db:"stop_lat" json:"stop_lat"`
+	StopLon            float64        `db:"stop_lon" json:"stop_lon"`
+	ZoneID             string         `db:"zone_id" json:"zone_id"`
+	StopURL            string         `db:"stop_url" json:"stop_url"`
+	LocationType       int            `db:"location_type" json:"location_type"`
+	ParentStation      string         `db:"parent_station" json:"parent_station"`
+	StopTimezone       string         `db:"stop_timezone" json:"stop_timezone"`
+	WheelchairBoarding int            `db:"wheelchair_boarding" json:"wheelchair_boarding"`
+	LevelID            string         `db:"level_id" json:"level_id"`
+	PlatformCode       string         `db:"platform_code" json:"platform_code"`
 }
 
 type Trip struct {

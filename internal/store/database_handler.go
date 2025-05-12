@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/Hajdudev/ecoDatabase/models"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,35 +20,36 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 
 type DatabaseStore interface {
 	GetUserByID(id string) (*models.User, error)
-	GetRoutesById(firstID string, secondID string) ([]string, error)
-	GetStopInfo(stopID string) (models.Stop, error)
+	GetRoutesById(firstID string, secondID string, ch chan<- []string, wg *sync.WaitGroup)
+	GetStopInfo(stopID string, ch chan<- models.Stop, wg *sync.WaitGroup)
 }
 
-func (pg *PostgresStore) GetStopInfo(stopID string) (models.Stop, error) {
+func (pg *PostgresStore) GetStopInfo(stopID string, ch chan<- models.Stop, wg *sync.WaitGroup) {
 	query := `
 		SELECT stop_id, stop_code, stop_name, stop_desc, stop_lat, stop_lon
 		FROM stops
 		WHERE stop_id = $1
 	`
-
 	var stop models.Stop
 
+	defer wg.Done()
 	err := pg.db.QueryRow(context.Background(), query, stopID).Scan(
 		&stop.StopID,
 		&stop.StopCode,
 		&stop.StopName,
 		&stop.StopDesc,
-		&stop.StopLat, &stop.StopLon,
+		&stop.StopLat,
+		&stop.StopLon,
 	)
 	if err != nil {
-		return models.Stop{}, fmt.Errorf("error querying stop info: %w", err)
+		ch <- models.Stop{}
+		return
 	}
 
-	fmt.Printf("this is the stop %+v", stop)
-	return stop, nil
+	ch <- stop
 }
 
-func (pg *PostgresStore) GetRoutesById(firstID string, secondID string) ([]string, error) {
+func (pg *PostgresStore) GetRoutesById(firstID string, secondID string, ch chan<- []string, wg *sync.WaitGroup) {
 	query := `
 		SELECT trip_id
 		FROM stop_times
@@ -55,26 +57,34 @@ func (pg *PostgresStore) GetRoutesById(firstID string, secondID string) ([]strin
 		GROUP BY trip_id
 		HAVING COUNT(DISTINCT stop_id) = 2
 	`
+	defer wg.Done()
 
 	rows, err := pg.db.Query(context.Background(), query, firstID, secondID)
 	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
+		fmt.Println("Error querying database:", err)
+		ch <- nil
+		return
 	}
-
 	defer rows.Close()
 
 	var trips []string
 	for rows.Next() {
 		var tripID string
 		if err := rows.Scan(&tripID); err != nil {
-			return nil, fmt.Errorf("error scanning row: %w", err)
+			fmt.Println("Error scanning row:", err)
+			ch <- nil
+			return
 		}
 		trips = append(trips, tripID)
 	}
+
 	if rows.Err() != nil {
-		return nil, fmt.Errorf("error during rows iteration: %w", rows.Err())
+		fmt.Println("Error during rows iteration:", rows.Err())
+		ch <- nil
+		return
 	}
-	return trips, nil
+
+	ch <- trips
 }
 
 func (pg *PostgresStore) GetUserByID(id string) (*models.User, error) {

@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/Hajdudev/ecoDatabase/internal/store"
+	"github.com/Hajdudev/ecoDatabase/models"
 )
 
 type DatabaseHandler struct {
@@ -33,22 +35,27 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	routes, err := wh.databaseStore.GetRoutesById(from, to)
-	if err != nil {
-		http.Error(w, "Error fetching routes", http.StatusInternalServerError)
-		return
-	}
-	fromStop, err := wh.databaseStore.GetStopInfo(from)
-	if err != nil {
-		http.Error(w, "Invalid 'from' id ", http.StatusBadRequest)
-		return
-	}
+	var wg sync.WaitGroup
 
-	toStop, err := wh.databaseStore.GetStopInfo(to)
-	if err != nil {
-		http.Error(w, "Invalid 'to' id", http.StatusBadRequest)
-		return
-	}
+	routesChan := make(chan []string)
+	fromStopChan := make(chan models.Stop)
+	toStopChan := make(chan models.Stop)
+
+	func() {
+		wg.Add(3)
+
+		go wh.databaseStore.GetRoutesById(from, to, routesChan, &wg)
+		go wh.databaseStore.GetStopInfo(from, fromStopChan, &wg)
+		go wh.databaseStore.GetStopInfo(to, toStopChan, &wg)
+		wg.Wait()
+		close(routesChan)
+		close(fromStopChan)
+		close(toStopChan)
+	}()
+
+	routes := <-routesChan
+	fromStop := <-fromStopChan
+	toStop := <-toStopChan
 
 	fmt.Fprintf(w, "The routes %s \n", strings.Join(routes, ", "))
 	fmt.Fprintf(w, "To data %+v\n", toStop)
