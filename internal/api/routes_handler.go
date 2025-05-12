@@ -1,10 +1,13 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/Hajdudev/ecoDatabase/internal/store"
 	"github.com/Hajdudev/ecoDatabase/models"
@@ -34,39 +37,54 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	var wg sync.WaitGroup
 
-	routesChan := make(chan []models.Trip, 1)
+	routesChan := make(chan map[string]string, 1)
+	tempStopChan := make(chan []models.TempStop, 1)
 	fromStopChan := make(chan models.Stop, 1)
 	toStopChan := make(chan models.Stop, 1)
-	errorChan := make(chan error, 3)
+	errorChan := make(chan error, 4)
 
-	wg.Add(3)
+	wg.Add(4)
+
+	handleError := func(err error, msg string) {
+		if err != nil {
+			errorChan <- fmt.Errorf("%s: %w", msg, err)
+			cancel()
+		}
+	}
 
 	go func() {
-		err := wh.databaseStore.GetRoutesById(from, to, routesChan, &wg)
-		if err != nil {
-			errorChan <- err
-		}
+		defer wg.Done()
+		err := wh.databaseStore.GetRoutesById(from, to, routesChan)
+		handleError(err, "Failed to get routes by ID")
 		close(routesChan)
 	}()
 	go func() {
-		err := wh.databaseStore.GetStopInfo(from, fromStopChan, &wg)
-		if err != nil {
-			errorChan <- err
-		}
+		defer wg.Done()
+		err := wh.databaseStore.GetStopTimesInfo(from, to, tempStopChan)
+		handleError(err, "Failed to get stop times info")
+		close(tempStopChan)
+	}()
+	go func() {
+		defer wg.Done()
+		err := wh.databaseStore.GetStopInfo(from, fromStopChan)
+		handleError(err, "Failed to get info for 'from' stop")
 		close(fromStopChan)
 	}()
 	go func() {
-		err := wh.databaseStore.GetStopInfo(to, toStopChan, &wg)
-		if err != nil {
-			errorChan <- err
-		}
+		defer wg.Done()
+		err := wh.databaseStore.GetStopInfo(to, toStopChan)
+		handleError(err, "Failed to get info for 'to' stop")
 		close(toStopChan)
 	}()
-	wg.Wait()
-	close(errorChan)
-
+	go func() {
+		wg.Wait()
+		close(errorChan)
+	}()
 	for err := range errorChan {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -74,12 +92,61 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	routes := <-routesChan
-	fromStop := <-fromStopChan
-	toStop := <-toStopChan
+	var tempStop []models.TempStop
+	var routes map[string]string
+	var fromStop models.Stop
+	var toStop models.Stop
 
-	fmt.Fprintf(w, "The routes %+v \n", routes)
-	fmt.Fprintf(w, "To data %+v\n", toStop)
-	fmt.Fprintf(w, "From data %+v\n", fromStop)
-	fmt.Fprintf(w, "Date: %s\n", date)
+	select {
+	case tempStop = <-tempStopChan:
+	case <-ctx.Done():
+		http.Error(w, "Timeout while fetching temporary stops", http.StatusGatewayTimeout)
+		return
+	}
+
+	select {
+	case routes = <-routesChan:
+	case <-ctx.Done():
+		http.Error(w, "Timeout while fetching routes", http.StatusGatewayTimeout)
+		return
+	}
+
+	select {
+	case fromStop = <-fromStopChan:
+	case <-ctx.Done():
+		http.Error(w, "Timeout while fetching 'from' stop info", http.StatusGatewayTimeout)
+		return
+	}
+
+	select {
+	case toStop = <-toStopChan:
+	case <-ctx.Done():
+		http.Error(w, "Timeout while fetching 'to' stop info", http.StatusGatewayTimeout)
+		return
+	}
+
+	var finalRoutes []models.RouteResult
+	for _, temp := range tempStop {
+		route := models.RouteResult{
+			TripId:             temp.TripID,
+			TripName:           routes[temp.TripID],
+			FromStopId:         temp.FromStopID,
+			FromStopName:       fromStop.StopName,
+			ToStopId:           temp.ToStopID,
+			ToStopName:         toStop.StopName,
+			DepartureTime:      temp.FromDepartureTime,
+			ArrivalTime:        temp.ToDepartureTime,
+			ServiceId:          "",
+			DepartureDayOffset: 0,
+			ArrivalDayOffset:   0,
+			SearchDate:         date,
+		}
+		finalRoutes = append(finalRoutes, route)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(finalRoutes); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }

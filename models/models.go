@@ -58,6 +58,13 @@ type StopTime struct {
 	Timepoint         int     `db:"timepoint" json:"timepoint"`
 }
 
+type TempStop struct {
+	TripID            string `db:"trip_id" json:"trip_id"`
+	FromStopID        string `db:"from_stop_id" json:"from_stop_id"`
+	FromDepartureTime string `db:"from_departure_time" json:"from_departure_time"`
+	ToStopID          string `db:"to_stop_id" json:"to_stop_id"`
+	ToDepartureTime   string `db:"to_departure_time" json:"to_departure_time"`
+}
 type Stop struct {
 	StopID             string         `db:"stop_id" json:"stop_id"`
 	StopCode           string         `db:"stop_code" json:"stop_code"`
@@ -98,16 +105,16 @@ type User struct {
 }
 
 type RouteResult struct {
-	tripId             string
-	tripName           string
-	fromStopId         string
-	fromStopName       string
-	toStopId           string
-	toStopName         string
-	departureTime      string
-	arrivalTime        string
-	serviceId          string
-	departureDayOffset int
-	arrivalDayOffset   int
-	searchDate         string
+	TripId             string
+	TripName           string
+	FromStopId         string
+	FromStopName       string
+	ToStopId           string
+	ToStopName         string
+	DepartureTime      string
+	ArrivalTime        string
+	ServiceId          string
+	DepartureDayOffset int
+	ArrivalDayOffset   int
+	SearchDate         string
 }
