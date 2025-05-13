@@ -26,6 +26,14 @@ func NewDatabaseHandler(databaseStore store.DatabaseStore, logger *log.Logger) *
 }
 
 func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	query := r.URL.Query()
 
 	from := query.Get("from")
@@ -44,7 +52,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 
 	toIdChan := make(chan []string, 1)
 	fromIdChan := make(chan []string, 1)
-	routesChan := make(chan map[string]string, 1)
+	routesChan := make(chan map[string]models.TripHash, 1)
 	tempStopChan := make(chan []models.TempStop, 1)
 	fromStopChan := make(chan models.Stop, 1)
 	toStopChan := make(chan models.Stop, 1)
@@ -123,7 +131,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tempStops []models.TempStop
-	var routes map[string]string
+	var routes map[string]models.TripHash
 	var fromStop models.Stop
 	var toStop models.Stop
 
@@ -159,14 +167,14 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	for _, temp := range tempStops {
 		route := models.RouteResult{
 			TripId:             temp.TripID,
-			TripName:           routes[temp.TripID],
+			TripName:           routes[temp.TripID].Headsign,
 			FromStopId:         temp.FromStopID,
 			FromStopName:       fromStop.StopName,
 			ToStopId:           temp.ToStopID,
 			ToStopName:         toStop.StopName,
 			DepartureTime:      temp.FromDepartureTime,
 			ArrivalTime:        temp.ToDepartureTime,
-			ServiceId:          "",
+			ServiceId:          routes[temp.TripID].ServiceID,
 			DepartureDayOffset: 0,
 			ArrivalDayOffset:   0,
 			SearchDate:         date,
