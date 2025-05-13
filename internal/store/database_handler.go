@@ -22,7 +22,7 @@ type DatabaseStore interface {
 	GetUserByID(id string) (*models.User, error)
 	GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]string) error
 	GetStopInfo(stopID string, ch chan<- models.Stop) error
-	GetStopTimesInfo(firstID string, secondID string, ch chan<- []models.TempStop) error
+	GetStopTimesInfo(firstID []string, secondID []string, ch chan<- []models.TempStop) error
 	GetStopsID(name string, ch chan<- []string) error
 }
 
@@ -51,7 +51,7 @@ func (pg *PostgresStore) GetStopInfo(stopID string, ch chan<- models.Stop) error
 	return nil
 }
 
-func (pg *PostgresStore) GetStopTimesInfo(firstID string, secondID string, ch chan<- []models.TempStop) error {
+func (pg *PostgresStore) GetStopTimesInfo(firstID []string, secondID []string, ch chan<- []models.TempStop) error {
 	query := `
 		SELECT 
 			t1.trip_id,
@@ -66,12 +66,23 @@ func (pg *PostgresStore) GetStopTimesInfo(firstID string, secondID string, ch ch
 		ON 
 			t1.trip_id = t2.trip_id
 		WHERE 
-			t1.stop_id = $1 AND t2.stop_id = $2
+			t1.stop_id = ANY($1) AND t2.stop_id = ANY($2)
 	`
 
-	rows, err := pg.db.Query(context.Background(), query, firstID, secondID)
+	firstArray := pgtype.Array[string]{
+		Elements: firstID,
+		Dims:     []pgtype.ArrayDimension{{Length: int32(len(firstID)), LowerBound: 1}},
+		Valid:    true,
+	}
+
+	secondArray := pgtype.Array[string]{
+		Elements: secondID,
+		Dims:     []pgtype.ArrayDimension{{Length: int32(len(secondID)), LowerBound: 1}},
+		Valid:    true,
+	}
+
+	rows, err := pg.db.Query(context.Background(), query, &firstArray, &secondArray)
 	if err != nil {
-		fmt.Println("Error querying database:", err)
 		ch <- nil
 		return err
 	}
@@ -81,17 +92,15 @@ func (pg *PostgresStore) GetStopTimesInfo(firstID string, secondID string, ch ch
 	for rows.Next() {
 		var trip models.TempStop
 		if err := rows.Scan(&trip.TripID, &trip.FromStopID, &trip.FromDepartureTime, &trip.ToStopID, &trip.ToDepartureTime); err != nil {
-			fmt.Println("Error scanning row data:", err)
 			ch <- nil
 			return err
 		}
 		trips = append(trips, trip)
 	}
 
-	if rows.Err() != nil {
-		fmt.Println("Error during rows iteration:", rows.Err())
+	if err := rows.Err(); err != nil {
 		ch <- nil
-		return rows.Err()
+		return err
 	}
 
 	ch <- trips
@@ -128,7 +137,7 @@ func (pg *PostgresStore) GetStopsID(name string, ch chan<- []string) error {
 
 func (pg *PostgresStore) GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]string) error {
 	query := `
-    SELECT trip_headsign, trip_id
+   SELECT trip_headsign, trip_id
     FROM trips
     WHERE trip_id IN (
         SELECT st1.trip_id

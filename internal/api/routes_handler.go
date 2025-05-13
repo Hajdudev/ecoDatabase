@@ -93,7 +93,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	}()
 	go func() {
 		defer wg.Done()
-		err := wh.databaseStore.GetStopTimesInfo(fromIDs[1], toIDs[1], tempStopChan)
+		err := wh.databaseStore.GetStopTimesInfo(fromIDs, toIDs, tempStopChan)
 		handleError(err, "Failed to get stop times info")
 		close(tempStopChan)
 	}()
