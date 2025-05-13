@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Hajdudev/ecoDatabase/models"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -134,45 +135,52 @@ func (pg *PostgresStore) GetRoutesById(firstID []string, secondID []string, ch c
         FROM stop_times st1
         JOIN stop_times st2
           ON st1.trip_id = st2.trip_id
-         AND st1.stop_id = ANY($1) -- No explicit casting needed
+         AND st1.stop_id = ANY($1)
          AND st2.stop_id = ANY($2)
          AND st1.stop_sequence < st2.stop_sequence
     )
   `
 
-	// Debug log for input parameters
-	fmt.Printf("GetRoutesById - firstID: %v, secondID: %v\n", firstID, secondID)
+	firstArray := pgtype.Array[string]{
+		Elements: firstID,
+		Dims:     []pgtype.ArrayDimension{{Length: int32(len(firstID)), LowerBound: 1}},
+		Valid:    true,
+	}
 
-	// Execute query
-	rows, err := pg.db.Query(context.Background(), query, firstID, secondID)
+	secondArray := pgtype.Array[string]{
+		Elements: secondID,
+		Dims:     []pgtype.ArrayDimension{{Length: int32(len(secondID)), LowerBound: 1}},
+		Valid:    true,
+	}
+
+	fmt.Printf("GetRoutesById - firstArray: %v, secondArray: %v\n", firstArray, secondArray)
+
+	rows, err := pg.db.Query(context.Background(), query, &firstArray, &secondArray)
 	if err != nil {
-		fmt.Println("Error querying database:", err)
+		fmt.Printf("Error querying database: %v\n", err)
 		ch <- nil
 		return err
 	}
 	defer rows.Close()
 
-	// Process rows
 	trips := make(map[string]string)
 	for rows.Next() {
 		var tripHeadsign string
 		var tripID string
 		if err := rows.Scan(&tripHeadsign, &tripID); err != nil {
-			fmt.Println("Error scanning row:", err)
+			fmt.Printf("Error scanning row: %v\n", err)
 			ch <- nil
 			return err
 		}
 		trips[tripID] = tripHeadsign
 	}
 
-	// Check for errors during rows iteration
 	if err := rows.Err(); err != nil {
-		fmt.Println("Error during rows iteration:", err)
+		fmt.Printf("Error during rows iteration: %v\n", err)
 		ch <- nil
 		return err
 	}
 
-	// Send results to channel
 	ch <- trips
 	return nil
 }
