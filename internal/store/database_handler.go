@@ -20,7 +20,7 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 
 type DatabaseStore interface {
 	GetUserByID(id string) (*models.User, error)
-	GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]string) error
+	GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]models.TripHash) error
 	GetStopInfo(stopID string, ch chan<- models.Stop) error
 	GetStopTimesInfo(firstID []string, secondID []string, ch chan<- []models.TempStop) error
 	GetStopsID(name string, ch chan<- []string) error
@@ -135,9 +135,9 @@ func (pg *PostgresStore) GetStopsID(name string, ch chan<- []string) error {
 	return nil
 }
 
-func (pg *PostgresStore) GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]string) error {
+func (pg *PostgresStore) GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]models.TripHash) error {
 	query := `
-   SELECT trip_headsign, trip_id
+    SELECT trip_id, trip_headsign, service_id
     FROM trips
     WHERE trip_id IN (
         SELECT st1.trip_id
@@ -162,8 +162,6 @@ func (pg *PostgresStore) GetRoutesById(firstID []string, secondID []string, ch c
 		Valid:    true,
 	}
 
-	fmt.Printf("GetRoutesById - firstArray: %v, secondArray: %v\n", firstArray, secondArray)
-
 	rows, err := pg.db.Query(context.Background(), query, &firstArray, &secondArray)
 	if err != nil {
 		fmt.Printf("Error querying database: %v\n", err)
@@ -172,16 +170,16 @@ func (pg *PostgresStore) GetRoutesById(firstID []string, secondID []string, ch c
 	}
 	defer rows.Close()
 
-	trips := make(map[string]string)
+	trips := make(map[string]models.TripHash)
 	for rows.Next() {
-		var tripHeadsign string
 		var tripID string
-		if err := rows.Scan(&tripHeadsign, &tripID); err != nil {
+		var trip models.TripHash
+		if err := rows.Scan(&tripID, &trip.Headsign, &trip.ServiceID); err != nil {
 			fmt.Printf("Error scanning row: %v\n", err)
 			ch <- nil
 			return err
 		}
-		trips[tripID] = tripHeadsign
+		trips[tripID] = trip
 	}
 
 	if err := rows.Err(); err != nil {

@@ -104,6 +104,11 @@ type User struct {
 	RecentRides []string  `db:"recent_rides" json:"recent_rides"`
 }
 
+type TripHash struct {
+	Headsign  string
+	ServiceID string
+}
+
 type RouteResult struct {
 	TripId             string
 	TripName           string
