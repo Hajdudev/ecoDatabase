@@ -79,9 +79,6 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	fromIDs := <-fromIdChan
 	toIDs := <-toIdChan
 
-	fmt.Println(fromIDs)
-	fmt.Println(toIDs)
-
 	if fromIDs == nil || toIDs == nil {
 		http.Error(w, "No stops found for given 'from' or 'to' locations", http.StatusNotFound)
 		return
