@@ -42,49 +42,82 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 
 	var wg sync.WaitGroup
 
+	toIdChan := make(chan []string, 1)
+	fromIdChan := make(chan []string, 1)
 	routesChan := make(chan map[string]string, 1)
 	tempStopChan := make(chan []models.TempStop, 1)
 	fromStopChan := make(chan models.Stop, 1)
 	toStopChan := make(chan models.Stop, 1)
-	errorChan := make(chan error, 4)
-
-	wg.Add(4)
+	errorChan := make(chan error, 1)
 
 	handleError := func(err error, msg string) {
 		if err != nil {
-			errorChan <- fmt.Errorf("%s: %w", msg, err)
+			select {
+			case errorChan <- fmt.Errorf("%s: %w", msg, err):
+			default:
+			}
 			cancel()
 		}
 	}
 
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err := wh.databaseStore.GetRoutesById(from, to, routesChan)
+		err := wh.databaseStore.GetStopsID(from, fromIdChan)
+		handleError(err, "Failed to get stops for 'from'")
+		close(fromIdChan)
+	}()
+	go func() {
+		defer wg.Done()
+		err := wh.databaseStore.GetStopsID(to, toIdChan)
+		handleError(err, "Failed to get stops for 'to'")
+		close(toIdChan)
+	}()
+
+	wg.Wait()
+
+	fromIDs := <-fromIdChan
+	toIDs := <-toIdChan
+
+	fmt.Println(fromIDs)
+	fmt.Println(toIDs)
+
+	if fromIDs == nil || toIDs == nil {
+		http.Error(w, "No stops found for given 'from' or 'to' locations", http.StatusNotFound)
+		return
+	}
+
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		err := wh.databaseStore.GetRoutesById(fromIDs, toIDs, routesChan)
 		handleError(err, "Failed to get routes by ID")
 		close(routesChan)
 	}()
 	go func() {
 		defer wg.Done()
-		err := wh.databaseStore.GetStopTimesInfo(from, to, tempStopChan)
+		err := wh.databaseStore.GetStopTimesInfo(fromIDs[1], toIDs[1], tempStopChan)
 		handleError(err, "Failed to get stop times info")
 		close(tempStopChan)
 	}()
 	go func() {
 		defer wg.Done()
-		err := wh.databaseStore.GetStopInfo(from, fromStopChan)
+		err := wh.databaseStore.GetStopInfo(fromIDs[1], fromStopChan)
 		handleError(err, "Failed to get info for 'from' stop")
 		close(fromStopChan)
 	}()
 	go func() {
 		defer wg.Done()
-		err := wh.databaseStore.GetStopInfo(to, toStopChan)
+		err := wh.databaseStore.GetStopInfo(toIDs[1], toStopChan)
 		handleError(err, "Failed to get info for 'to' stop")
 		close(toStopChan)
 	}()
+
 	go func() {
 		wg.Wait()
 		close(errorChan)
 	}()
+
 	for err := range errorChan {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -92,13 +125,13 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var tempStop []models.TempStop
+	var tempStops []models.TempStop
 	var routes map[string]string
 	var fromStop models.Stop
 	var toStop models.Stop
 
 	select {
-	case tempStop = <-tempStopChan:
+	case tempStops = <-tempStopChan:
 	case <-ctx.Done():
 		http.Error(w, "Timeout while fetching temporary stops", http.StatusGatewayTimeout)
 		return
@@ -126,7 +159,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var finalRoutes []models.RouteResult
-	for _, temp := range tempStop {
+	for _, temp := range tempStops {
 		route := models.RouteResult{
 			TripId:             temp.TripID,
 			TripName:           routes[temp.TripID],
