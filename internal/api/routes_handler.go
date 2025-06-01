@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -23,6 +24,16 @@ func NewDatabaseHandler(databaseStore store.DatabaseStore, logger *log.Logger) *
 		databaseStore: databaseStore,
 		logger:        logger,
 	}
+}
+
+func normalizeTime(t string) string {
+	var hour, min, sec int
+	_, err := fmt.Sscanf(t, "%d:%d:%d", &hour, &min, &sec)
+	if err != nil {
+		return t
+	}
+	hour = hour % 24
+	return fmt.Sprintf("%02d:%02d:%02d", hour, min, sec)
 }
 
 func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
@@ -55,8 +66,11 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	routesChan := make(chan map[string]models.TripHash, 1)
 	tempStopChan := make(chan []models.TempStop, 1)
 	fromStopChan := make(chan models.Stop, 1)
+	dateChan := make(chan string, 1)
 	toStopChan := make(chan models.Stop, 1)
 	errorChan := make(chan error, 1)
+
+	var service_date string
 
 	handleError := func(err error, msg string) {
 		if err != nil {
@@ -68,12 +82,20 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		err := wh.databaseStore.GetStopsID(from, fromIdChan)
 		handleError(err, "Failed to get stops for 'from'")
 		close(fromIdChan)
+	}()
+	go func() {
+		defer wg.Done()
+		err := wh.databaseStore.GetCalendarType(date, dateChan)
+		handleError(err, "Failed to get calendarDate")
+		service_date := <-dateChan
+		fmt.Println("The service_date", service_date)
+		close(dateChan)
 	}()
 	go func() {
 		defer wg.Done()
@@ -101,7 +123,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	}()
 	go func() {
 		defer wg.Done()
-		err := wh.databaseStore.GetStopTimesInfo(fromIDs, toIDs, tempStopChan)
+		err := wh.databaseStore.GetStopTimesInfo(fromIDs, toIDs, service_date, tempStopChan)
 		handleError(err, "Failed to get stop times info")
 		close(tempStopChan)
 	}()
@@ -164,7 +186,9 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var finalRoutes []models.RouteResult
+
 	for _, temp := range tempStops {
+		fmt.Printf("Date: %s", temp.FromDepartureTime)
 		route := models.RouteResult{
 			TripId:             temp.TripID,
 			TripName:           routes[temp.TripID].Headsign,
@@ -172,8 +196,8 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 			FromStopName:       fromStop.StopName,
 			ToStopId:           temp.ToStopID,
 			ToStopName:         toStop.StopName,
-			DepartureTime:      temp.FromDepartureTime,
-			ArrivalTime:        temp.ToDepartureTime,
+			DepartureTime:      normalizeTime(temp.FromDepartureTime),
+			ArrivalTime:        normalizeTime(temp.ToDepartureTime),
 			ServiceId:          routes[temp.TripID].ServiceID,
 			DepartureDayOffset: 0,
 			ArrivalDayOffset:   0,
@@ -181,6 +205,9 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		finalRoutes = append(finalRoutes, route)
 	}
+	sort.Slice(finalRoutes, func(i, j int) bool {
+		return finalRoutes[i].DepartureTime < finalRoutes[j].DepartureTime
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(finalRoutes); err != nil {

@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type ServiceID struct {
+	ServiceID bool `db:"service_id" json:"service_id"`
+}
+
 type PostgresStore struct {
 	db *pgxpool.Pool
 }
@@ -22,8 +26,21 @@ type DatabaseStore interface {
 	GetUserByID(id string) (*models.User, error)
 	GetRoutesById(firstID []string, secondID []string, ch chan<- map[string]models.TripHash) error
 	GetStopInfo(stopID string, ch chan<- models.Stop) error
-	GetStopTimesInfo(firstID []string, secondID []string, ch chan<- []models.TempStop) error
+	GetStopTimesInfo(firstID []string, secondID []string, date string, ch chan<- []models.TempStop) error
 	GetStopsID(name string, ch chan<- []string) error
+	GetCalendarType(date string, ch chan<- string) error
+}
+
+func (pg *PostgresStore) GetCalendarType(date string, ch chan<- string) error {
+	query := `SELECT service_id FROM calendar_dates WHERE date = $1`
+	var serviceID string
+	err := pg.db.QueryRow(context.Background(), query, date).Scan(&serviceID)
+	if err != nil {
+		ch <- ""
+		return err
+	}
+	ch <- serviceID
+	return nil
 }
 
 func (pg *PostgresStore) GetStopInfo(stopID string, ch chan<- models.Stop) error {
@@ -51,9 +68,9 @@ func (pg *PostgresStore) GetStopInfo(stopID string, ch chan<- models.Stop) error
 	return nil
 }
 
-func (pg *PostgresStore) GetStopTimesInfo(firstID []string, secondID []string, ch chan<- []models.TempStop) error {
+func (pg *PostgresStore) GetStopTimesInfo(firstID []string, secondID []string, date string, ch chan<- []models.TempStop) error {
 	query := `
-		SELECT 
+SELECT 
 			t1.trip_id,
 			t1.stop_id AS from_stop_id,
 			t1.departure_time AS from_departure_time,
@@ -63,10 +80,17 @@ func (pg *PostgresStore) GetStopTimesInfo(firstID []string, secondID []string, c
 			stop_times t1
 		JOIN 
 			stop_times t2
-		ON 
-			t1.trip_id = t2.trip_id
+			ON t1.trip_id = t2.trip_id
+		JOIN 
+			trips tr
+			ON t1.trip_id = tr.trip_id
+		JOIN 
+			calendar_dates cd
+			ON tr.service_id = cd.service_id
 		WHERE 
-			t1.stop_id = ANY($1) AND t2.stop_id = ANY($2)
+			t1.stop_id = ANY($1)
+			AND t2.stop_id = ANY($2)
+			AND cd.date = $3
 	`
 
 	firstArray := pgtype.Array[string]{
