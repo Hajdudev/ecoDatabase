@@ -71,26 +71,21 @@ func (pg *PostgresStore) GetStopInfo(stopID string, ch chan<- models.Stop) error
 func (pg *PostgresStore) GetStopTimesInfo(firstID []string, secondID []string, date string, ch chan<- []models.TempStop) error {
 	query := `
 SELECT 
-			t1.trip_id,
-			t1.stop_id AS from_stop_id,
-			t1.departure_time AS from_departure_time,
-			t2.stop_id AS to_stop_id,
-			t2.departure_time AS to_departure_time
-		FROM 
-			stop_times t1
-		JOIN 
-			stop_times t2
-			ON t1.trip_id = t2.trip_id
-		JOIN 
-			trips tr
-			ON t1.trip_id = tr.trip_id
-		JOIN 
-			calendar_dates cd
-			ON tr.service_id = cd.service_id
-		WHERE 
-			t1.stop_id = ANY($1)
-			AND t2.stop_id = ANY($2)
-			AND cd.date = $3
+    t1.trip_id,
+    t1.stop_id AS from_stop_id,
+    t1.departure_time AS from_departure_time,
+    t2.stop_id AS to_stop_id,
+    t2.departure_time AS to_departure_time
+FROM 
+    stop_times t1
+JOIN 
+    stop_times t2 ON t1.trip_id = t2.trip_id
+JOIN 
+    trips tr ON t1.trip_id = tr.trip_id
+WHERE 
+    t1.stop_id = ANY($1)
+    AND t2.stop_id = ANY($2)
+    AND tr.service_id = $3
 	`
 
 	firstArray := pgtype.Array[string]{
@@ -105,7 +100,7 @@ SELECT
 		Valid:    true,
 	}
 
-	rows, err := pg.db.Query(context.Background(), query, &firstArray, &secondArray)
+	rows, err := pg.db.Query(context.Background(), query, &firstArray, &secondArray, date)
 	if err != nil {
 		ch <- nil
 		return err

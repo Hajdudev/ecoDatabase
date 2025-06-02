@@ -93,8 +93,7 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 		defer wg.Done()
 		err := wh.databaseStore.GetCalendarType(date, dateChan)
 		handleError(err, "Failed to get calendarDate")
-		service_date := <-dateChan
-		fmt.Println("The service_date", service_date)
+		service_date = <-dateChan
 		close(dateChan)
 	}()
 	go func() {
@@ -188,17 +187,16 @@ func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	var finalRoutes []models.RouteResult
 
 	for _, temp := range tempStops {
-		fmt.Printf("Date: %s", temp.FromDepartureTime)
 		route := models.RouteResult{
-			TripId:             temp.TripID,
-			TripName:           routes[temp.TripID].Headsign,
-			FromStopId:         temp.FromStopID,
-			FromStopName:       fromStop.StopName,
-			ToStopId:           temp.ToStopID,
-			ToStopName:         toStop.StopName,
-			DepartureTime:      normalizeTime(temp.FromDepartureTime),
-			ArrivalTime:        normalizeTime(temp.ToDepartureTime),
-			ServiceId:          routes[temp.TripID].ServiceID,
+			TripId:        temp.TripID,
+			TripName:      routes[temp.TripID].Headsign,
+			FromStopId:    temp.FromStopID,
+			FromStopName:  fromStop.StopName,
+			ToStopId:      temp.ToStopID,
+			ToStopName:    toStop.StopName,
+			DepartureTime: normalizeTime(temp.FromDepartureTime),
+			ArrivalTime:   normalizeTime(temp.ToDepartureTime),
+			// ServiceId:          routes[temp.TripID].ServiceID,
 			DepartureDayOffset: 0,
 			ArrivalDayOffset:   0,
 			SearchDate:         date,
