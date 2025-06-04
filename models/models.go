@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+type Marker struct {
+	Name string `db:"stop_name" json:"stop_name"`
+	Lat  string `db:"stop_lat" json:"stop_lat"`
+	Lon  string `db:"stop_lon" json:"stop_lon"`
+}
+
 type Calendar struct {
 	ServiceID string    `db:"service_id" json:"service_id"`
 	Monday    bool      `db:"monday" json:"monday"`
