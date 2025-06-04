@@ -10,5 +10,6 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 	r.Get("/health", app.HealthCheck)
 	r.Get("/find/route", app.DatabaseHandler.FindRoute)
+	r.Get("/names", app.DatabaseHandler.StopNames)
 	return r
 }

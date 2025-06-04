@@ -10,11 +10,12 @@ import (
 )
 
 func Open() (*pgxpool.Pool, error) {
-	err := godotenv.Load()
-	if err != nil {
-		panic(err)
-	}
+	_ = godotenv.Load()
+
 	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is not set")
+	}
 	dbpool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to create connection pool: %v\n", err)

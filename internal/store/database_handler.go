@@ -29,6 +29,7 @@ type DatabaseStore interface {
 	GetStopTimesInfo(firstID []string, secondID []string, date string, ch chan<- []models.TempStop) error
 	GetStopsID(name string, ch chan<- []string) error
 	GetCalendarType(date string, ch chan<- string) error
+	GetStopsNames() ([]string, error)
 }
 
 func (pg *PostgresStore) GetCalendarType(date string, ch chan<- string) error {
@@ -66,6 +67,30 @@ func (pg *PostgresStore) GetStopInfo(stopID string, ch chan<- models.Stop) error
 
 	ch <- stop
 	return nil
+}
+
+func (pg *PostgresStore) GetStopsNames() ([]string, error) {
+	query := `SELECT DISTINCT stop_name FROM stops`
+	rows, err := pg.db.Query(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stops []string
+	for rows.Next() {
+		var stopName string
+		if err := rows.Scan(&stopName); err != nil {
+			return nil, err
+		}
+		stops = append(stops, stopName)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return stops, nil
 }
 
 func (pg *PostgresStore) GetStopTimesInfo(firstID []string, secondID []string, date string, ch chan<- []models.TempStop) error {

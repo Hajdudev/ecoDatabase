@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Hajdudev/ecoDatabase/internal/app"
@@ -10,21 +11,33 @@ import (
 )
 
 func main() {
-	app, err := app.NewApplication()
+	log.Print("starting server...")
+
+	application, err := app.NewApplication()
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to start application: %v", err)
 	}
-	app.Logger.Println("We are running the app")
-	r := routes.SetupRoutes(app)
+
+	application.Logger.Println("We are running the app")
+
+	r := routes.SetupRoutes(application)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3003"
+		log.Printf("defaulting to port %s", port)
+	}
+
 	server := &http.Server{
-		Addr:         ":3001",
+		Addr:         ":" + port,
 		Handler:      r,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
-	err = server.ListenAndServe()
-	if err != nil {
-		fmt.Println(err)
+
+	log.Printf("listening on port %s", port)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal(err)
 	}
 }

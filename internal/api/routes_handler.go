@@ -36,6 +36,19 @@ func normalizeTime(t string) string {
 	return fmt.Sprintf("%02d:%02d:%02d", hour, min, sec)
 }
 
+func (wh *DatabaseHandler) StopNames(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
+	stops, err := wh.databaseStore.GetStopsNames()
+	if err != nil {
+		http.Error(w, "There was a error getting the names", http.StatusBadRequest)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(stops); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
