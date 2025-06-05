@@ -37,10 +37,21 @@ func normalizeTime(t string) string {
 }
 
 func (wh *DatabaseHandler) StopNames(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	stops, err := wh.databaseStore.GetStopsNames()
 	if err != nil {
-		http.Error(w, "There was a error getting the names", http.StatusBadRequest)
+		http.Error(w, "There was an error getting the names", http.StatusBadRequest)
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(stops); err != nil {
@@ -50,12 +61,14 @@ func (wh *DatabaseHandler) StopNames(w http.ResponseWriter, r *http.Request) {
 }
 
 func (wh *DatabaseHandler) FindRoute(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
+	// Set CORS headers for all requests
+	w.Header().Set("Access-Control-Allow-Origin", "*") // Use specific origin if credentials/cookies are needed
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+	w.Header().Set("Access-Control-Allow-Credentials", "true") // Only if not using '*'
 
 	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	query := r.URL.Query()
